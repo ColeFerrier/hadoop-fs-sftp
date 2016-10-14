@@ -156,7 +156,7 @@ class SFTPConnectionPool {
         return jsch;
     }
 
-    private Session connectClient(JSch jschClient, String host, int port, String user, String password) throws JSchException {
+    private Session connectClient(JSch jschClient, String host, int port, String user, String password, java.util.Properties config) throws JSchException {
         Session session = null;
 
         if (user == null || user.length() == 0) {
@@ -182,8 +182,6 @@ class SFTPConnectionPool {
                     session.setPassword(password);
                 }
 
-                java.util.Properties config = new java.util.Properties();
-                config.put("StrictHostKeyChecking", "no");
                 session.setConfig(config);
                     /*
                         Ugly fix for the verify:false error Jsch throws when you make thousands of connections.
@@ -211,7 +209,7 @@ class SFTPConnectionPool {
         return session;
     }
 
-    public ChannelSftp connect(String host, int port, String user, String password, byte[] publicKey) throws IOException {
+    public ChannelSftp connect(String host, int port, String user, String password, byte[] publicKey, java.util.Properties config) throws IOException {
         ConnectionInfo info = new ConnectionInfo(host, port, user);
         try {
             ChannelSftp channel = getChannelFromPool(host, port, user);
@@ -220,7 +218,7 @@ class SFTPConnectionPool {
             }
 
             JSch jsch = this.createClientWithKeyBytes(user, password, publicKey);
-            Session session = this.connectClient(jsch, host, port, user, password);
+            Session session = this.connectClient(jsch, host, port, user, password, config);
             channel = (ChannelSftp) session.openChannel("sftp");
             channel.connect();
             synchronized (this) {
@@ -236,7 +234,7 @@ class SFTPConnectionPool {
     }
 
     public ChannelSftp connect(String host, int port, String user,
-                               String password, String keyFile) throws IOException {
+                               String password, String keyFile, java.util.Properties config) throws IOException {
         ConnectionInfo info = new ConnectionInfo(host, port, user);
         try {
             ChannelSftp channel = getChannelFromPool(host, port, user);
@@ -245,7 +243,7 @@ class SFTPConnectionPool {
             }
 
             JSch jsch = this.createClientWithKeyFile(user, password, keyFile);
-            Session session = this.connectClient(jsch, host, port, user, password);
+            Session session = this.connectClient(jsch, host, port, user, password, config);
             channel = (ChannelSftp) session.openChannel("sftp");
             channel.connect();
             synchronized (this) {

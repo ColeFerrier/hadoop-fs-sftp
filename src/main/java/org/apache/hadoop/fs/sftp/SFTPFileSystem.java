@@ -49,6 +49,7 @@ public class SFTPFileSystem extends FileSystem {
 
     private SFTPConnectionPool connectionPool;
     private URI uri;
+    private java.util.Properties jschSessionConfig;
 
     private static final int DEFAULT_SFTP_PORT = 22;
     private static final int DEFAULT_MAX_CONNECTION = 5;
@@ -155,11 +156,10 @@ public class SFTPFileSystem extends FileSystem {
         String keyString = conf.get(FS_SFTP_KEYSTRING, "");
         ChannelSftp channel;
         if(keyFile != null) {
-            channel = connectionPool.connect(host, port, user, pwd, keyFile);
+            channel = connectionPool.connect(host, port, user, pwd, keyFile, jschSessionConfig);
         } else {
-            channel = connectionPool.connect(host, port, user, pwd, keyString.getBytes());
+            channel = connectionPool.connect(host, port, user, pwd, keyString.getBytes(), jschSessionConfig);
         }
-
         return channel;
     }
 
@@ -500,6 +500,17 @@ public class SFTPFileSystem extends FileSystem {
         setConfigurationFromURI(uriInfo, conf);
         setConf(conf);
         this.uri = uriInfo;
+
+	jschSessionConfig = new java.util.Properties();
+        jschSessionConfig.put("StrictHostKeyChecking", "no");
+        jschSessionConfig.put("PreferredAuthentications", "gssapi-with-mic,publickey,password,keyboard-interactive");
+	java.util.Map<String, String> jsch_conf = conf.getValByRegex("jsch\\.session\\.*");
+
+	for(String key: jsch_conf.keySet()) {
+		String value = jsch_conf.get(key);
+		key = key.substring(13);
+		jschSessionConfig.put(key, value);
+	}
     }
 
     @Override
