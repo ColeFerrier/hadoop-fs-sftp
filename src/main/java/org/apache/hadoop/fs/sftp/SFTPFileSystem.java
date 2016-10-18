@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
 
+import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.ChannelSftp.LsEntry;
 import com.jcraft.jsch.SftpATTRS;
@@ -54,7 +55,7 @@ public class SFTPFileSystem extends FileSystem {
     private static final int DEFAULT_SFTP_PORT = 22;
     private static final int DEFAULT_MAX_CONNECTION = 5;
     public static final int DEFAULT_BUFFER_SIZE = 1024 * 1024;
-    public static final int DEFAULT_BLOCK_SIZE = 4 * 1024;
+    public static final long DEFAULT_BLOCK_SIZE = 64 * 1024 * 1024;
     public static final String FS_SFTP_USER_PREFIX = "fs.sftp.user.";
     public static final String FS_SFTP_PASSWORD_PREFIX = "fs.sftp.password.";
     public static final String FS_SFTP_HOST = "fs.sftp.host";
@@ -225,7 +226,7 @@ public class SFTPFileSystem extends FileSystem {
             long length = -1; // Length of root directory on server not known
             boolean isDir = true;
             int blockReplication = 1;
-            long blockSize = DEFAULT_BLOCK_SIZE; // Block Size not known.
+            long blockSize = 0; //DEFAULT_BLOCK_SIZE; // Block Size not known.
             long modTime = -1; // Modification time of root directory not known.
             Path root = new Path("/");
             return new FileStatus(length, isDir, blockReplication, blockSize,
@@ -288,7 +289,7 @@ public class SFTPFileSystem extends FileSystem {
         int blockReplication = 1;
         // Using default block size since there is no way in SFTP channel to know of
         // block sizes on server. The assumption could be less than ideal.
-        long blockSize = DEFAULT_BLOCK_SIZE;
+        long blockSize = length; //DEFAULT_BLOCK_SIZE;
         long modTime = attr.getMTime() * 1000; // convert to milliseconds
         long accessTime = 0;
         FsPermission permission = getPermissions(sftpFile);
@@ -493,9 +494,33 @@ public class SFTPFileSystem extends FileSystem {
         return renamed;
     }
 
+    public static class JSchLogger implements com.jcraft.jsch.Logger {
+        public static final Log LOG = LogFactory.getLog(JSch.class);
+
+        public boolean isEnabled(int level) {
+            return true;
+        }
+
+        public void log(int level, String message) {
+            if(level == DEBUG) {
+                LOG.debug(message);
+            } else if(level == INFO) {
+                LOG.info(message);
+            } else if(level == WARN) {
+                LOG.warn(message);
+            } else if(level == ERROR) {
+                LOG.error(message);
+            } else if(level == FATAL) {
+                LOG.fatal(message);
+            };
+        }
+    }
+
     @Override
     public void initialize(URI uriInfo, Configuration conf) throws IOException {
         super.initialize(uriInfo, conf);
+
+        JSch.setLogger(new JSchLogger());
 
         setConfigurationFromURI(uriInfo, conf);
         setConf(conf);
@@ -503,7 +528,7 @@ public class SFTPFileSystem extends FileSystem {
 
 	jschSessionConfig = new java.util.Properties();
         jschSessionConfig.put("StrictHostKeyChecking", "no");
-        jschSessionConfig.put("PreferredAuthentications", "gssapi-with-mic,publickey,password,keyboard-interactive");
+        // jschSessionConfig.put("PreferredAuthentications", "gssapi-with-mic,publickey,password,keyboard-interactive");
 	java.util.Map<String, String> jsch_conf = conf.getValByRegex("jsch\\.session\\.*");
 
 	for(String key: jsch_conf.keySet()) {
